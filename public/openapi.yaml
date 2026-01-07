@@ -1,0 +1,1185 @@
+openapi: 3.1.0
+info:
+  title: YouTube Summaries API
+  description: |
+    API documentation for YouTube Summaries - AI-powered video transcript extraction and summarization.
+
+    ## API Versioning
+
+    All public API endpoints are now versioned under `/api/v1/*` for future-proofing:
+    - **Versioned endpoints** (recommended): `/api/v1/summarize`, `/api/v1/chat`, etc.
+    - **Unversioned endpoints** (deprecated): `/api/summarize`, `/api/chat`, etc. (proxy to v1)
+
+    This versioning strategy allows backwards compatibility while enabling API evolution.
+
+    ## API Layers
+
+    This documentation covers three API layers:
+    1. **Next.js API Routes** - Main application endpoints (`/api/v1/*`)
+    2. **Cloudflare Worker** - D1 caching layer for transcripts
+    3. **fast-proxy-api** - Source for transcript/metadata (see API_REFERENCE.md)
+
+    ## Authentication
+
+    - Most endpoints are public with IP-based rate limiting
+    - Authenticated endpoints require Clerk session cookies
+    - Webhook endpoints use signature verification
+
+    ## Rate Limiting
+
+    All endpoints return rate limit headers:
+    - `X-RateLimit-Limit`: Maximum requests allowed
+    - `X-RateLimit-Remaining`: Requests remaining in window
+    - `X-RateLimit-Reset`: Unix timestamp when limit resets
+  version: 2.0.0
+  contact:
+    name: YouTube Summaries
+    url: https://youtubesummaries.cc
+  license:
+    name: MIT
+
+servers:
+  - url: https://youtubesummaries.cc
+    description: Production
+  - url: http://localhost:3000
+    description: Development
+  - url: https://youtube-transcript-storage.automatehub.workers.dev
+    description: Cloudflare Worker (Transcript Cache)
+  - url: https://api1.youtubesummaries.cc
+    description: fast-proxy-api (Transcript Source)
+
+tags:
+  - name: AI
+    description: AI-powered summarization and chat endpoints
+  - name: YouTube
+    description: YouTube video and channel data
+  - name: Subscription
+    description: Polar.sh payment and subscription management
+  - name: Auth
+    description: Authentication endpoints
+  - name: Transcript Cache
+    description: Cloudflare Worker D1 caching layer
+
+paths:
+  # ===========================================
+  # NEXT.JS API ROUTES (v1 - Versioned)
+  # ===========================================
+
+  /api/v1/summarize:
+    post:
+      tags: [AI]
+      summary: Generate AI summary from transcript
+      description: |
+        Streams an AI-generated summary of a video transcript using Server-Sent Events (SSE).
+
+        **Model:** `anthropic/claude-3-haiku` via OpenRouter
+
+        **Rate Limits:**
+        - Anonymous: 10 requests/minute
+        - Authenticated: 30 requests/minute
+      operationId: generateSummaryV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SummarizeRequest'
+            example:
+              transcript: "In this video we discuss the fundamentals of machine learning..."
+              videoId: "dQw4w9WgXcQ"
+      responses:
+        '200':
+          description: SSE stream of summary content
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/SSEStream'
+              example: |
+                data: {"content":"1. **Main Topic"}
+
+                data: {"content":" & Context**\n"}
+
+                data: {"content":"   - The video"}
+
+                data: [DONE]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/chat:
+    post:
+      tags: [AI]
+      summary: Chat about video transcript
+      description: |
+        Q&A chat about a video transcript using Server-Sent Events (SSE).
+
+        **Authentication Required**
+
+        **Model:** `openai/gpt-4o-mini` via OpenRouter
+
+        **Rate Limit:** 20 requests/minute (authenticated only)
+
+        **Max transcript length:** 20,000 characters
+      operationId: chatAboutTranscriptV1
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            example:
+              messages:
+                - role: user
+                  content: "What are the main points of this video?"
+              transcript: "In this video we discuss..."
+      responses:
+        '200':
+          description: SSE stream of chat response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/SSEStream'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+              example:
+                error: "Authentication required"
+                message: "Please sign in to use the chat feature."
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/youtube/search:
+    get:
+      tags: [YouTube]
+      summary: Search YouTube videos
+      description: |
+        Search for YouTube videos with multi-tier fallback:
+        1. fast-proxy-api backend (preferred)
+        2. Direct YouTube Data API v3 (if API key configured)
+        3. Demo videos (final fallback)
+
+        **Rate Limit:** 30 requests/minute
+      operationId: searchVideosV1
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+          example: "machine learning tutorial"
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+              examples:
+                success:
+                  summary: Live results
+                  value:
+                    videos:
+                      - id: "dQw4w9WgXcQ"
+                        title: "Rick Astley - Never Gonna Give You Up"
+                        thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"
+                        channelTitle: "Rick Astley"
+                        publishedAt: "2009-10-25T06:57:33Z"
+                demo:
+                  summary: Demo fallback
+                  value:
+                    videos: []
+                    isDemo: true
+                    warning: "YouTube API quota exceeded. Showing demo videos."
+        '400':
+          description: Missing query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Query parameter is required"
+
+  /api/v1/channel/{channelId}:
+    get:
+      tags: [YouTube]
+      summary: Get channel info and recent uploads
+      description: |
+        Fetch YouTube channel information and recent video uploads.
+
+        Uses same fallback strategy as search endpoint.
+
+        **Rate Limit:** 20 requests/minute
+      operationId: getChannelV1
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: YouTube channel ID
+          schema:
+            type: string
+          example: "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      responses:
+        '200':
+          description: Channel data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelResponse'
+        '400':
+          description: Missing channel ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Channel ID is required"
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Channel not found"
+
+  /api/v1/beta:
+    post:
+      tags: [Auth]
+      summary: Join beta waitlist
+      description: |
+        Register email for beta access waitlist.
+
+        **Rate Limit:** 5 requests/hour per IP
+      operationId: joinBetaV1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BetaSignupRequest'
+            example:
+              email: "user@example.com"
+              source: "homepage"
+      responses:
+        '201':
+          description: Successfully joined waitlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaSignupResponse'
+              example:
+                message: "Successfully joined the beta waitlist!"
+        '200':
+          description: Already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaSignupResponse'
+              example:
+                message: "You're already on the list! We'll be in touch soon."
+        '400':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Please enter a valid email address"
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  # ===========================================
+  # LEGACY UNVERSIONED ENDPOINTS (Deprecated)
+  # ===========================================
+  # These endpoints proxy to /api/v1/* for backwards compatibility
+  # Clients should migrate to v1 endpoints
+
+  /api/summarize:
+    post:
+      tags: [AI]
+      summary: Generate AI summary from transcript (deprecated)
+      deprecated: true
+      description: |
+        **DEPRECATED:** Use `/api/v1/summarize` instead. This endpoint proxies to v1 for backwards compatibility.
+
+        Streams an AI-generated summary of a video transcript using Server-Sent Events (SSE).
+
+        **Model:** `anthropic/claude-3-haiku` via OpenRouter
+
+        **Rate Limits:**
+        - Anonymous: 10 requests/minute
+        - Authenticated: 30 requests/minute
+      operationId: generateSummary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SummarizeRequest'
+            example:
+              transcript: "In this video we discuss the fundamentals of machine learning..."
+              videoId: "dQw4w9WgXcQ"
+      responses:
+        '200':
+          description: SSE stream of summary content
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/SSEStream'
+              example: |
+                data: {"content":"1. **Main Topic"}
+
+                data: {"content":" & Context**\n"}
+
+                data: {"content":"   - The video"}
+
+                data: [DONE]
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/chat:
+    post:
+      tags: [AI]
+      summary: Chat about video transcript (deprecated)
+      deprecated: true
+      description: |
+        **DEPRECATED:** Use `/api/v1/chat` instead. This endpoint proxies to v1 for backwards compatibility.
+
+        Q&A chat about a video transcript using Server-Sent Events (SSE).
+
+        **Authentication Required**
+
+        **Model:** `openai/gpt-4o-mini` via OpenRouter
+
+        **Rate Limit:** 20 requests/minute (authenticated only)
+
+        **Max transcript length:** 20,000 characters
+      operationId: chatAboutTranscript
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+            example:
+              messages:
+                - role: user
+                  content: "What are the main points of this video?"
+              transcript: "In this video we discuss..."
+      responses:
+        '200':
+          description: SSE stream of chat response
+          headers:
+            X-RateLimit-Limit:
+              $ref: '#/components/headers/X-RateLimit-Limit'
+            X-RateLimit-Remaining:
+              $ref: '#/components/headers/X-RateLimit-Remaining'
+            X-RateLimit-Reset:
+              $ref: '#/components/headers/X-RateLimit-Reset'
+          content:
+            text/event-stream:
+              schema:
+                $ref: '#/components/schemas/SSEStream'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthError'
+              example:
+                error: "Authentication required"
+                message: "Please sign in to use the chat feature."
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/youtube/search:
+    get:
+      tags: [YouTube]
+      summary: Search YouTube videos (deprecated)
+      deprecated: true
+      description: |
+        **DEPRECATED:** Use `/api/v1/youtube/search` instead. This endpoint proxies to v1 for backwards compatibility.
+
+        Search for YouTube videos with multi-tier fallback:
+        1. fast-proxy-api backend (preferred)
+        2. Direct YouTube Data API v3 (if API key configured)
+        3. Demo videos (final fallback)
+
+        **Rate Limit:** 30 requests/minute
+      operationId: searchVideos
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+          example: "machine learning tutorial"
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+              examples:
+                success:
+                  summary: Live results
+                  value:
+                    videos:
+                      - id: "dQw4w9WgXcQ"
+                        title: "Rick Astley - Never Gonna Give You Up"
+                        thumbnail: "https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"
+                        channelTitle: "Rick Astley"
+                        publishedAt: "2009-10-25T06:57:33Z"
+                demo:
+                  summary: Demo fallback
+                  value:
+                    videos: []
+                    isDemo: true
+                    warning: "YouTube API quota exceeded. Showing demo videos."
+        '400':
+          description: Missing query parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Query parameter is required"
+
+  /api/channel/{channelId}:
+    get:
+      tags: [YouTube]
+      summary: Get channel info and recent uploads (deprecated)
+      deprecated: true
+      description: |
+        **DEPRECATED:** Use `/api/v1/channel/{channelId}` instead. This endpoint proxies to v1 for backwards compatibility.
+
+        Fetch YouTube channel information and recent video uploads.
+
+        Uses same fallback strategy as search endpoint.
+
+        **Rate Limit:** 20 requests/minute
+      operationId: getChannel
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: YouTube channel ID
+          schema:
+            type: string
+          example: "UCX6OQ3DkcsbYNE6H8uQQuVA"
+      responses:
+        '200':
+          description: Channel data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChannelResponse'
+        '400':
+          description: Missing channel ID
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Channel ID is required"
+        '404':
+          description: Channel not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Channel not found"
+
+  /api/beta:
+    post:
+      tags: [Auth]
+      summary: Join beta waitlist (deprecated)
+      deprecated: true
+      description: |
+        **DEPRECATED:** Use `/api/v1/beta` instead. This endpoint proxies to v1 for backwards compatibility.
+
+        Register email for beta access waitlist.
+
+        **Rate Limit:** 5 requests/hour per IP
+      operationId: joinBeta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BetaSignupRequest'
+            example:
+              email: "user@example.com"
+              source: "homepage"
+      responses:
+        '201':
+          description: Successfully joined waitlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaSignupResponse'
+              example:
+                message: "Successfully joined the beta waitlist!"
+        '200':
+          description: Already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BetaSignupResponse'
+              example:
+                message: "You're already on the list! We'll be in touch soon."
+        '400':
+          description: Invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Please enter a valid email address"
+        '429':
+          $ref: '#/components/responses/RateLimitExceeded'
+
+  /api/checkout:
+    get:
+      tags: [Subscription]
+      summary: Redirect to Polar.sh checkout
+      description: |
+        Redirects to Polar.sh hosted checkout page for subscription purchase.
+
+        Uses `@polar-sh/nextjs` Checkout component.
+      operationId: checkout
+      responses:
+        '302':
+          description: Redirect to Polar.sh checkout
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Polar.sh checkout URL
+
+  /api/portal:
+    get:
+      tags: [Subscription]
+      summary: Redirect to customer portal
+      description: |
+        Redirects authenticated users to Polar.sh customer portal to manage subscription.
+
+        **Authentication Required**
+
+        Looks up `polar_customer_id` from user's profile in Supabase.
+      operationId: customerPortal
+      security:
+        - clerkAuth: []
+      responses:
+        '302':
+          description: Redirect to Polar.sh customer portal
+          headers:
+            Location:
+              schema:
+                type: string
+              description: Polar.sh portal URL
+        '401':
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Unauthorized"
+        '500':
+          description: Profile lookup failed or no subscription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "No subscription found. Please subscribe first."
+
+  /api/webhook/polar:
+    post:
+      tags: [Subscription]
+      summary: Polar.sh webhook handler
+      description: |
+        Handles Polar.sh webhook events for subscription lifecycle.
+
+        **Events Handled:**
+        - `order.created` - New order placed
+        - `subscription.created` - Subscription started
+        - `subscription.updated` - Subscription changed
+        - `subscription.canceled` - Subscription cancelled
+        - `customer.state_changed` - Customer state changed
+
+        **Signature Verification:** Uses `POLAR_WEBHOOK_SECRET`
+      operationId: polarWebhook
+      security:
+        - polarWebhookSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PolarWebhookPayload'
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '401':
+          description: Invalid webhook signature
+
+  /api/auth/callback:
+    get:
+      tags: [Auth]
+      summary: Supabase OAuth callback
+      description: |
+        Handles OAuth callback from Supabase authentication providers.
+
+        Exchanges authorization code for session and redirects to specified URL.
+      operationId: authCallback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          description: Authorization code from OAuth provider
+          schema:
+            type: string
+        - name: next
+          in: query
+          required: false
+          description: URL to redirect after authentication
+          schema:
+            type: string
+            default: "/"
+      responses:
+        '302':
+          description: Redirect to next URL after session exchange
+          headers:
+            Location:
+              schema:
+                type: string
+
+  # ===========================================
+  # CLOUDFLARE WORKER API (Transcript Cache)
+  # ===========================================
+
+  /fetch:
+    post:
+      tags: [Transcript Cache]
+      summary: Fetch and cache transcript
+      description: |
+        Fetches a YouTube transcript from upstream API and caches it in D1 database.
+
+        **Base URL:** `https://youtube-transcript-storage.automatehub.workers.dev`
+      operationId: fetchTranscript
+      servers:
+        - url: https://youtube-transcript-storage.automatehub.workers.dev
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FetchTranscriptRequest'
+            example:
+              video: "dQw4w9WgXcQ"
+              languages: ["en"]
+              force: false
+      responses:
+        '200':
+          description: Transcript fetched/cached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FetchTranscriptResponse'
+              example:
+                message: "Transcript fetched and stored"
+                cached: false
+                data:
+                  id: 1
+                  video_id: "dQw4w9WgXcQ"
+                  title: "Rick Astley - Never Gonna Give You Up"
+                  author_name: "Rick Astley"
+                  author_url: "https://www.youtube.com/@RickAstleyYT"
+                  thumbnail_url: "https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"
+                  captions: "We're no strangers to love..."
+                  timestamps: ["0:01 - [Music]", "0:18 - We're no strangers to love"]
+                  created_at: "2024-01-01T00:00:00Z"
+                  updated_at: "2024-01-01T00:00:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /transcript/{videoId}:
+    get:
+      tags: [Transcript Cache]
+      summary: Get cached transcript
+      description: |
+        Retrieves a previously cached transcript by video ID.
+
+        **Base URL:** `https://youtube-transcript-storage.automatehub.workers.dev`
+      operationId: getTranscript
+      servers:
+        - url: https://youtube-transcript-storage.automatehub.workers.dev
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          description: YouTube video ID
+          schema:
+            type: string
+          example: "dQw4w9WgXcQ"
+      responses:
+        '200':
+          description: Cached transcript
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptRecord'
+        '404':
+          description: Transcript not found in cache
+    delete:
+      tags: [Transcript Cache]
+      summary: Delete cached transcript
+      description: |
+        Removes a transcript from the D1 cache.
+
+        **Base URL:** `https://youtube-transcript-storage.automatehub.workers.dev`
+      operationId: deleteTranscript
+      servers:
+        - url: https://youtube-transcript-storage.automatehub.workers.dev
+      parameters:
+        - name: videoId
+          in: path
+          required: true
+          description: YouTube video ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transcript deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Transcript deleted"
+        '404':
+          description: Transcript not found
+
+  /transcripts:
+    get:
+      tags: [Transcript Cache]
+      summary: List cached transcripts
+      description: |
+        Lists all cached transcripts with pagination.
+
+        **Base URL:** `https://youtube-transcript-storage.automatehub.workers.dev`
+      operationId: listTranscripts
+      servers:
+        - url: https://youtube-transcript-storage.automatehub.workers.dev
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of results
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: List of cached transcripts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranscriptListResponse'
+
+components:
+  securitySchemes:
+    clerkAuth:
+      type: apiKey
+      in: cookie
+      name: __session
+      description: Clerk session cookie
+    polarWebhookSignature:
+      type: apiKey
+      in: header
+      name: X-Polar-Signature
+      description: Polar.sh webhook signature
+
+  headers:
+    X-RateLimit-Limit:
+      description: Maximum requests allowed in window
+      schema:
+        type: integer
+    X-RateLimit-Remaining:
+      description: Requests remaining in current window
+      schema:
+        type: integer
+    X-RateLimit-Reset:
+      description: Unix timestamp when rate limit resets
+      schema:
+        type: integer
+
+  schemas:
+    # Request Schemas
+    SummarizeRequest:
+      type: object
+      required: [transcript]
+      properties:
+        transcript:
+          type: string
+          description: Video transcript text (max 6000 chars used)
+          maxLength: 100000
+        videoId:
+          type: string
+          description: YouTube video ID for tracking
+        userId:
+          type: string
+          description: User ID for analytics
+
+    ChatRequest:
+      type: object
+      required: [messages, transcript]
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatMessage'
+          description: Chat message history
+        transcript:
+          type: string
+          description: Video transcript for context (max 20000 chars)
+          maxLength: 100000
+
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+
+    BetaSignupRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address
+        source:
+          type: string
+          default: website
+          description: Signup source for analytics
+
+    FetchTranscriptRequest:
+      type: object
+      required: [video]
+      properties:
+        video:
+          type: string
+          description: YouTube URL or video ID
+        languages:
+          type: array
+          items:
+            type: string
+          default: ["en"]
+          description: Language codes (ISO 639-1)
+        force:
+          type: boolean
+          default: false
+          description: Force refetch even if cached
+
+    PolarWebhookPayload:
+      type: object
+      properties:
+        type:
+          type: string
+          enum:
+            - order.created
+            - subscription.created
+            - subscription.updated
+            - subscription.canceled
+            - customer.state_changed
+        data:
+          type: object
+          description: Event-specific payload
+
+    # Response Schemas
+    SSEStream:
+      type: string
+      description: |
+        Server-Sent Events stream format:
+        ```
+        data: {"content":"text chunk"}\n\n
+        data: {"content":"more text"}\n\n
+        data: [DONE]\n\n
+        ```
+
+    SearchResponse:
+      type: object
+      properties:
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/VideoSummary'
+        isDemo:
+          type: boolean
+          description: True if returning demo data due to API issues
+        warning:
+          type: string
+          description: Warning message when using fallback data
+
+    VideoSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          description: YouTube video ID
+        title:
+          type: string
+        thumbnail:
+          type: string
+          format: uri
+        channelTitle:
+          type: string
+        publishedAt:
+          type: string
+          format: date-time
+
+    ChannelResponse:
+      type: object
+      properties:
+        channelInfo:
+          $ref: '#/components/schemas/ChannelInfo'
+        videos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelVideo'
+        isDemo:
+          type: boolean
+        warning:
+          type: string
+
+    ChannelInfo:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        thumbnail:
+          type: string
+          format: uri
+        subscriberCount:
+          type: string
+          description: Formatted subscriber count (e.g., "1.5M")
+
+    ChannelVideo:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        thumbnail:
+          type: string
+          format: uri
+        publishedAt:
+          type: string
+          description: Formatted date (e.g., "Dec 1, 2024")
+        duration:
+          type: string
+          description: ISO 8601 duration (e.g., "PT10M30S")
+
+    BetaSignupResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    TranscriptRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        video_id:
+          type: string
+        title:
+          type: string
+        author_name:
+          type: string
+        author_url:
+          type: string
+          format: uri
+        thumbnail_url:
+          type: string
+          format: uri
+        captions:
+          type: string
+          description: Plain text transcript
+        timestamps:
+          oneOf:
+            - type: array
+              items:
+                type: string
+            - type: string
+          description: Timestamped transcript lines (array or JSON string)
+        language_code:
+          type: string
+        is_ai_generated:
+          type: integer
+          enum: [0, 1]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    FetchTranscriptResponse:
+      type: object
+      properties:
+        message:
+          type: string
+        cached:
+          type: boolean
+          description: True if retrieved from cache
+        data:
+          $ref: '#/components/schemas/TranscriptRecord'
+
+    TranscriptListResponse:
+      type: object
+      properties:
+        transcripts:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              video_id:
+                type: string
+              title:
+                type: string
+              author_name:
+                type: string
+              created_at:
+                type: string
+              updated_at:
+                type: string
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    # Error Schemas
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    AuthError:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    RateLimitError:
+      type: object
+      properties:
+        error:
+          type: string
+          example: "Rate limit exceeded. Please try again later."
+        retryAfter:
+          type: integer
+          description: Seconds until rate limit resets
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimitExceeded:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until rate limit resets
+        X-RateLimit-Limit:
+          $ref: '#/components/headers/X-RateLimit-Limit'
+        X-RateLimit-Remaining:
+          $ref: '#/components/headers/X-RateLimit-Remaining'
+        X-RateLimit-Reset:
+          $ref: '#/components/headers/X-RateLimit-Reset'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RateLimitError'
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"

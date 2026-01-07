@@ -1,0 +1,43 @@
+{
+  "name": "YouTube Summaries",
+  "short_name": "YT Summaries",
+  "description": "Extract transcripts and AI-powered summaries from YouTube videos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/apple-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "education"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Search Videos",
+      "short_name": "Search",
+      "description": "Search for YouTube videos",
+      "url": "/search",
+      "icons": [
+        {
+          "src": "/icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "related_applications": [],
+  "prefer_related_applications": false
+}

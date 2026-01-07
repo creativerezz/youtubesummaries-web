@@ -1,0 +1,7 @@
+<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background bar (sky-500 - darker blue) -->
+  <rect x="45" y="45" width="28" height="90" rx="11" transform="rotate(20 59 90)" fill="#0ea5e9"/>
+  <!-- Foreground bar (sky-300 - lighter blue, offset with more space) -->
+  <rect x="75" y="45" width="28" height="90" rx="11" transform="rotate(20 89 90)" fill="#7dd3fc"/>
+</svg>
+

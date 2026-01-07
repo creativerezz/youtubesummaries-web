@@ -1,0 +1,16 @@
+{
+    "editor.experimentalGpuAcceleration": "on",
+    "notebook.diff.experimental.toggleInline": true,
+    "notebook.experimental.remoteSave": true,
+    "swift.backgroundCompilation": true,
+    "npm-intellisense.packageSubfoldersIntellisense": true,
+    "claudeCode.environmentVariables": [
+
+    ],
+    "keyboard.touchbar.enabled": false,
+    "workbench.commandPalette.experimental.suggestCommands": true,
+    "workbench.externalBrowser": "chrome",
+    "workbench.list.smoothScrolling": true,
+    "workbench.activityBar.orientation": "vertical",
+    "docwriter.style": "Auto-detect"
+}

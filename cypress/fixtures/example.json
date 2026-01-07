@@ -1,0 +1,12 @@
+{
+  "videoId": "dQw4w9WgXcQ",
+  "title": "Test Video Title",
+  "author": "Test Author",
+  "transcript": "This is a sample transcript for testing purposes. It contains multiple sentences to simulate real video content.",
+  "summary": "## Summary\n\nThis is a test summary of the video content.",
+  "timestamps": [
+    { "time": 0, "text": "Hello everyone..." },
+    { "time": 5, "text": "Welcome to this video..." },
+    { "time": 12, "text": "Today we will discuss..." }
+  ]
+}

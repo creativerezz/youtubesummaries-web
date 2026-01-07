@@ -1,0 +1,6 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background bar (sky-500 - darker blue) -->
+  <rect x="8" y="8" width="5" height="16" rx="2" transform="rotate(20 10.5 16)" fill="#0ea5e9"/>
+  <!-- Foreground bar (sky-300 - lighter blue, offset with more space) -->
+  <rect x="14" y="8" width="5" height="16" rx="2" transform="rotate(20 16.5 16)" fill="#7dd3fc"/>
+</svg>
