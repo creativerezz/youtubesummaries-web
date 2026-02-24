@@ -97,7 +97,7 @@ export function FeaturedChannels() {
   }, [])
 
   return (
-    <section className="container mx-auto px-4 py-12 sm:py-16">
+    <section className="container mx-auto px-4 py-16 sm:py-20 md:py-24 lg:py-32">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Popular Channels

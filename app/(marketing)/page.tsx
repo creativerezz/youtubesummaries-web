@@ -13,7 +13,6 @@ import {
 import { SparklesIcon, ZapIcon, ShieldIcon, Loader2 } from "lucide-react"
 import VideoAnalyzer from "@/components/youtube/video-analyzer"
 import { FeaturedChannels } from "@/components/youtube/featured-channels"
-import { LiveCounter } from "@/components/trust-signals"
 
 function VideoAnalyzerFallback() {
   return (
@@ -145,16 +144,11 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
 
-        {/* Live Activity Counter */}
-        <section className="container mx-auto px-4 py-8 flex justify-center">
-          <LiveCounter />
-        </section>
-
-        <div id="demo">
+        <section id="demo" className="py-12 sm:py-16 md:py-20">
           <Suspense fallback={<VideoAnalyzerFallback />}>
             <VideoAnalyzer />
           </Suspense>
-        </div>
+        </section>
 
         {/* Featured Channels Section */}
         <FeaturedChannels />

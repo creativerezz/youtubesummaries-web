@@ -4,12 +4,8 @@ import type React from "react"
 import { useState, useRef } from "react"
 import useSWR from "swr"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +13,6 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import { Copy, Check, ArrowUp, Download, ExternalLink, MoreVertical, FileText } from "lucide-react"
 import { toast } from "sonner"
 
 interface VideoCaptionsProps {
@@ -100,23 +95,21 @@ export function VideoCaptions({ videoId, captions: providedCaptions, onDownload,
 
   if (isLoading && !providedCaptions) {
     return (
-      <Card>
-        <CardHeader>
+      <div className="flex flex-col h-full min-h-0">
+        <div className="shrink-0 pb-3">
           <div className="flex items-center justify-between">
-            <Skeleton className="h-6 w-24" />
-            <Skeleton className="h-9 w-32" />
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-8 w-28" />
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/6" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-          </div>
-        </CardContent>
-      </Card>
+        </div>
+        <div className="flex-1 min-h-0 space-y-3 p-4 sm:p-5">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-5/6" />
+          <Skeleton className="h-4 w-4/6" />
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-4 w-3/4" />
+        </div>
+      </div>
     )
   }
 
@@ -134,82 +127,50 @@ export function VideoCaptions({ videoId, captions: providedCaptions, onDownload,
   const charCount = captions.length
 
   return (
-    <Card className="overflow-hidden relative flex flex-col h-full border-0 shadow-none bg-transparent">
-      <CardHeader className="pb-3 space-y-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <FileText className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base font-semibold">Captions</CardTitle>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleCopy} 
-              className="gap-2 h-8 text-xs"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Copied</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Copy</span>
-                </>
-              )}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreVertical className="h-4 w-4" />
-                  <span className="sr-only">More options</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={handleOpenInChatGPT}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Open in ChatGPT
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleDownload}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+    <div className="overflow-hidden relative flex flex-col h-full min-h-0">
+      <div className="shrink-0 px-4 pb-2 flex items-center justify-between gap-4">
+        <span className="text-[11px] text-muted-foreground">{wordCount.toLocaleString()} words</span>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="text-[11px] text-muted-foreground hover:text-foreground"
+          >
+            {copied ? "Copied" : "Copy"}
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground p-0.5">
+                ···
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40 text-xs">
+              <DropdownMenuItem onClick={handleOpenInChatGPT}>
+                ChatGPT
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleDownload}>
+                Download
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        <div className="flex items-center gap-2 mt-2">
-          <Badge variant="secondary" className="text-xs font-normal">
-            {wordCount.toLocaleString()} words
-          </Badge>
-          <Badge variant="secondary" className="text-xs font-normal">
-            {charCount.toLocaleString()} chars
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea ref={scrollAreaRef} className="h-[500px]" onScroll={handleScroll}>
-          <div className="p-4 sm:p-6">
-            <div className="prose prose-sm sm:prose-base max-w-none leading-relaxed text-foreground dark:prose-invert prose-p:text-foreground/90 prose-p:mb-3">
-              <p className="whitespace-pre-wrap font-sans">{captions}</p>
-            </div>
+      </div>
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea ref={scrollAreaRef} className="h-full min-h-[200px]" onScroll={handleScroll}>
+          <div className="p-4">
+            <p className="whitespace-pre-wrap text-xs leading-relaxed text-foreground/90">{captions}</p>
           </div>
         </ScrollArea>
         {showBackToTop && (
-          <Button 
-            onClick={scrollToTop} 
-            size="icon" 
-            className="absolute bottom-4 right-4 rounded-full shadow-lg z-10 h-9 w-9"
-            variant="secondary"
+          <button
+            type="button"
+            onClick={scrollToTop}
+            className="absolute bottom-4 right-4 text-[11px] text-muted-foreground hover:text-foreground z-10"
           >
-            <ArrowUp className="h-4 w-4" />
-            <span className="sr-only">Back to top</span>
-          </Button>
+            ↑ top
+          </button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

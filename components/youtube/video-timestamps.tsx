@@ -4,14 +4,10 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import useSWR from "swr"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
-import { Clock, ArrowUp } from "lucide-react"
 
 interface VideoTimestampsProps {
   videoId: string
@@ -61,25 +57,20 @@ export function VideoTimestamps({ videoId, onTimestampClick, currentTime = 0 }: 
 
   if (isLoading) {
     return (
-      <Card className="flex flex-col h-full">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="h-5 w-20" />
-          </div>
-        </CardHeader>
-        <Separator />
-        <CardContent>
-          <div className="space-y-4">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="flex gap-4">
-                <Skeleton className="h-5 w-16" />
-                <Skeleton className="h-5 flex-1" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col h-full min-h-0">
+        <div className="shrink-0 pb-3 flex items-center justify-between">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="h-5 w-20" />
+        </div>
+        <div className="flex-1 min-h-0 space-y-3 p-4 sm:p-5">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="flex gap-4">
+              <Skeleton className="h-5 w-16 shrink-0" />
+              <Skeleton className="h-5 flex-1" />
+            </div>
+          ))}
+        </div>
+      </div>
     )
   }
 
@@ -94,22 +85,11 @@ export function VideoTimestamps({ videoId, onTimestampClick, currentTime = 0 }: 
   if (!data || data.length === 0) return null
 
   return (
-    <Card className="overflow-hidden relative flex flex-col h-full border-0 shadow-none bg-transparent">
-      <CardHeader className="pb-3 space-y-0">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-base font-semibold">Timestamps</CardTitle>
-          </div>
-          <Badge variant="secondary" className="text-xs font-normal">
-            {data.length.toLocaleString()} entries
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="flex-1 p-0 overflow-hidden">
-        <ScrollArea ref={scrollAreaRef} className="h-[500px]" onScroll={handleScroll}>
-          <div className="p-4 sm:p-6">
-            <div className="space-y-2">
+    <div className="overflow-hidden relative flex flex-col h-full min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden">
+        <ScrollArea ref={scrollAreaRef} className="h-full min-h-[200px]" onScroll={handleScroll}>
+          <div className="p-4">
+            <div className="space-y-0">
               {data.map((entry, index) => {
                 const match = entry.match(/^([0-9:]+)\s*-\s*(.+)$/)
                 if (!match) return null
@@ -122,14 +102,12 @@ export function VideoTimestamps({ videoId, onTimestampClick, currentTime = 0 }: 
                   <div
                     key={index}
                     onClick={() => onTimestampClick?.(seconds)}
-                    className="group flex gap-4 pl-4 py-2.5 transition-all hover:bg-muted/50 rounded-md cursor-pointer"
+                    className="flex gap-3 py-2 border-b border-border/30 last:border-0 cursor-pointer hover:bg-muted/20"
                   >
-                    <div className="font-mono text-xs sm:text-sm font-medium text-muted-foreground group-hover:text-primary transition-colors shrink-0 min-w-[4rem]">
-                      {timestamp}
-                    </div>
-                    <div className="flex-1 text-sm sm:text-base leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors">
+                    <span className="font-mono text-[11px] text-muted-foreground shrink-0 w-12">{timestamp}</span>
+                    <span className="flex-1 text-xs text-foreground/80 leading-relaxed">
                       {text}
-                    </div>
+                    </span>
                   </div>
                 )
               })}
@@ -137,17 +115,15 @@ export function VideoTimestamps({ videoId, onTimestampClick, currentTime = 0 }: 
           </div>
         </ScrollArea>
         {showBackToTop && (
-          <Button 
-            onClick={scrollToTop} 
-            size="icon" 
-            className="absolute bottom-4 right-4 rounded-full shadow-lg z-10 h-9 w-9"
-            variant="secondary"
+          <button
+            type="button"
+            onClick={scrollToTop}
+            className="absolute bottom-4 right-4 text-[11px] text-muted-foreground hover:text-foreground z-10"
           >
-            <ArrowUp className="h-4 w-4" />
-            <span className="sr-only">Back to top</span>
-          </Button>
+            ↑ top
+          </button>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

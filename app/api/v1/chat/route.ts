@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import {
   rateLimiters,
   checkRateLimit,
+  getIdentifier,
   rateLimitResponse,
   rateLimitHeaders,
 } from "@/lib/rate-limit";
@@ -20,36 +21,32 @@ export async function POST(req: Request) {
       { status: 503, headers: { "Content-Type": "application/json" } }
     );
   }
-  // 1. Require authentication for chat
+  // 1. Check authentication (optional - affects rate limit tier)
   let userId: string | null = null;
   try {
     const authResult = await auth();
     userId = authResult.userId || null;
   } catch (authError) {
-    // Clerk middleware not configured or not available
     const err = authError as Error;
     if (!err.message?.includes("clerkMiddleware")) {
       throw authError;
     }
-    console.warn("Clerk auth not available");
-  }
-  
-  if (!userId) {
-    return new Response(
-      JSON.stringify({
-        error: "Authentication required",
-        message: "Please sign in to use the chat feature.",
-      }),
-      { status: 401, headers: { "Content-Type": "application/json" } }
-    );
+    console.warn("Clerk auth not available, proceeding as anonymous user");
   }
 
+  const identifier = getIdentifier(req, userId);
+  const limiter = userId
+    ? rateLimiters.chatAuthenticated
+    : rateLimiters.chatAnonymous;
+
   // 2. Check rate limit
-  const rateLimit = await checkRateLimit(rateLimiters.chat, userId);
+  const rateLimit = await checkRateLimit(limiter, identifier);
   if (!rateLimit.success) {
     return rateLimitResponse(
       rateLimit,
-      "Chat rate limit exceeded. Please wait before sending more messages."
+      userId
+        ? "Chat rate limit exceeded. Please wait before sending more messages."
+        : "Rate limit exceeded. Sign in for higher limits."
     );
   }
 

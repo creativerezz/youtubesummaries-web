@@ -39,12 +39,12 @@ const nextConfig: NextConfig = {
     // Build CSP header
     const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://*.clerk.com https://clerk.com https://cdn.clerk.com",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.google-analytics.com https://*.clerk.com https://clerk.com https://cdn.clerk.com https://*.clerk.accounts.dev",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: https: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.youtubesummaries.cc https://api1.youtubesummaries.cc https://youtube-edge-api.automatehub.workers.dev https://*.automatehub.workers.dev https://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.com https://cdn.clerk.com https://*.posthog.com https://www.google-analytics.com https://www.googletagmanager.com",
-      "frame-src 'self' https://www.youtube.com https://*.youtube.com https://*.clerk.com https://clerk.com",
+      "connect-src 'self' https://api.supadata.ai https://api.youtubesummaries.cc https://api1.youtubesummaries.cc https://youtube-edge-api.automatehub.workers.dev https://*.automatehub.workers.dev https://*.supabase.co https://*.clerk.accounts.dev https://*.clerk.com https://clerk.com https://cdn.clerk.com https://*.posthog.com https://www.google-analytics.com https://www.googletagmanager.com",
+      "frame-src 'self' https://www.youtube.com https://*.youtube.com https://*.clerk.com https://clerk.com https://*.clerk.accounts.dev",
       "media-src 'self' blob:",
       "object-src 'none'",
       "base-uri 'self'",

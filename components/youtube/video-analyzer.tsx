@@ -3,7 +3,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -32,9 +31,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import {
-  Play, X, Copy, Loader2, FileText, Sparkles, Download,
+  Play, X, Copy, Loader2, Download,
   ExternalLink, Save, MoreVertical, Share2, Twitter, Facebook,
-  MessageCircle, Clock, Lock, Crown, ClipboardPaste
+  ClipboardPaste
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { toast } from 'sonner'
@@ -48,8 +47,7 @@ import {
 } from '@/lib/youtube'
 import type { ExampleVideo, TranscriptData } from '@/lib/youtube'
 
-// New components for 4-tab system
-import { SwipeableTabs } from './swipeable-tabs'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { VideoPlayer } from './video-player'
 import { VideoCaptions } from './video-captions'
 import { VideoTimestamps } from './video-timestamps'
@@ -78,38 +76,32 @@ function MarkdownContent({ text }: { text: string }) {
   if (!text) return null
 
   return (
-    <div className="prose prose-slate dark:prose-invert prose-sm sm:prose-base max-w-none">
+    <div className="prose prose-slate dark:prose-invert prose-sm max-w-none text-xs">
       <ReactMarkdown
         components={{
-          h1: (props) => <h1 className="text-xl sm:text-2xl font-bold text-foreground mt-6 mb-4" {...props} />,
-          h2: (props) => <h2 className="text-lg sm:text-xl font-bold text-foreground mt-5 mb-3" {...props} />,
-          h3: (props) => <h3 className="text-sm sm:text-base font-bold mt-4 mb-2 text-[#00A5F4] leading-tight" {...props} />,
-          h4: (props) => <h4 className="text-xs sm:text-sm font-bold mt-3 mb-1.5 text-[#00A5F4]" {...props} />,
-          p: (props) => <p className="text-xs sm:text-sm text-foreground/90 leading-relaxed mb-2 sm:mb-3" {...props} />,
-          ul: (props) => <ul className="list-disc ml-4 sm:ml-6 my-2 space-y-1" {...props} />,
-          ol: (props) => <ol className="list-decimal ml-4 sm:ml-6 my-2 space-y-1" {...props} />,
-          li: (props) => <li className="text-xs sm:text-sm text-foreground/90" {...props} />,
+          h1: (props) => <h1 className="text-sm font-medium mt-4 mb-2" {...props} />,
+          h2: (props) => <h2 className="text-sm font-medium mt-3 mb-1.5" {...props} />,
+          h3: (props) => <h3 className="text-xs font-medium mt-3 mb-1" {...props} />,
+          h4: (props) => <h4 className="text-xs font-medium mt-2 mb-1" {...props} />,
+          p: (props) => <p className="text-xs leading-relaxed mb-2 text-foreground/90" {...props} />,
+          ul: (props) => <ul className="list-disc ml-4 my-2 space-y-0.5" {...props} />,
+          ol: (props) => <ol className="list-decimal ml-4 my-2 space-y-0.5" {...props} />,
+          li: (props) => <li className="text-xs" {...props} />,
           code: ({ className, children, ...props }) => {
             const isInline = !/language-(\w+)/.exec(className || '')
             return isInline ? (
-              <code className="rounded bg-muted px-1.5 py-0.5 text-xs sm:text-sm font-mono text-foreground" {...props}>
-                {children}
-              </code>
+              <code className="bg-muted/50 px-1 font-mono text-[11px]" {...props}>{children}</code>
             ) : (
-              <pre className="overflow-x-auto rounded-lg border border-border bg-muted p-3 my-3">
+              <pre className="overflow-x-auto bg-muted/30 p-2 my-2 text-[11px]">
                 <code className={className} {...props}>{children}</code>
               </pre>
             )
           },
           a: ({ children, ...props }) => (
-            <a className="text-primary underline-offset-4 hover:underline" target="_blank" rel="noopener noreferrer" {...props}>
-              {children}
-            </a>
+            <a className="underline" target="_blank" rel="noopener noreferrer" {...props}>{children}</a>
           ),
-          strong: (props) => <strong className="font-semibold text-foreground" {...props} />,
-          blockquote: (props) => (
-            <blockquote className="border-l-4 border-primary pl-4 italic text-foreground/80 my-3" {...props} />
-          ),
+          strong: (props) => <strong className="font-medium" {...props} />,
+          blockquote: (props) => <blockquote className="border-l pl-3 my-2 text-foreground/70 text-[11px]" {...props} />,
         }}
       >
         {text}
@@ -165,40 +157,12 @@ function ErrorState({ error }: { error: string }) {
   )
 }
 
-// Pro upgrade prompt component
-function ProUpgradePrompt({ feature }: { feature: string }) {
-  // Use /api/checkout which will use default POLAR_PRODUCT_ID from server
-  const checkoutUrl = `/api/checkout`
-  
-  return (
-    <div className="flex flex-col items-center justify-center h-full text-center p-6 sm:p-8">
-      <div className="mb-6 relative">
-        <Crown className="h-16 w-16 sm:h-20 sm:w-20 text-primary mb-4 mx-auto" />
-        <Lock className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground absolute -bottom-2 -right-2 bg-background rounded-full p-1" />
-      </div>
-      <h3 className="text-lg sm:text-xl font-semibold text-foreground mb-2">
-        {feature} is a Pro Feature
-      </h3>
-      <p className="text-muted-foreground text-sm sm:text-base mb-6 max-w-md">
-        Upgrade to Pro to unlock AI-powered summaries, chat with videos, and more premium features.
-      </p>
-      <Button asChild size="lg" className="gap-2">
-        <Link href={checkoutUrl}>
-          <Crown className="h-4 w-4" />
-          Upgrade to Pro
-        </Link>
-      </Button>
-    </div>
-  )
-}
-
 // Video Results Content Component (reusable for Drawer/Sheet)
 function VideoResultsContent({
   transcript,
   currentVideoId,
   activeTab,
   setActiveTab,
-  isPro,
   summary,
   isLoadingSummary,
   isStreaming,
@@ -212,7 +176,6 @@ function VideoResultsContent({
   currentVideoId: string
   activeTab: string
   setActiveTab: (tab: string) => void
-  isPro: boolean
   summary: string | null
   isLoadingSummary: boolean
   isStreaming: boolean
@@ -223,153 +186,89 @@ function VideoResultsContent({
   handleTimestampClick: (seconds: number) => void
 }) {
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* SwipeableTabs with 4 tabs */}
-      <SwipeableTabs
-        defaultValue="captions"
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="flex-1 flex flex-col min-h-0"
-      >
-        <div className="px-2 sm:px-4 md:px-6 pt-1 sm:pt-1.5 shrink-0">
-          <SwipeableTabs.List className="grid grid-cols-4 gap-0.5 sm:gap-1">
-            <SwipeableTabs.Trigger 
-              value="captions" 
-              className="text-[11px] sm:text-xs md:text-sm px-1 sm:px-1.5 md:px-3 py-2.5 sm:py-2.5 md:py-3"
-              title="Captions"
-            >
-              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4 flex-shrink-0" />
-              <span className="hidden min-[360px]:inline truncate max-w-[60px] sm:max-w-none ml-0.5 sm:ml-1.5">Captions</span>
-            </SwipeableTabs.Trigger>
-            <SwipeableTabs.Trigger 
-              value="timestamps" 
-              className="text-[11px] sm:text-xs md:text-sm px-1 sm:px-1.5 md:px-3 py-2.5 sm:py-2.5 md:py-3"
-              title="Timestamps"
-            >
-              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4 flex-shrink-0" />
-              <span className="hidden min-[360px]:inline truncate max-w-[60px] sm:max-w-none ml-0.5 sm:ml-1.5">Timestamps</span>
-            </SwipeableTabs.Trigger>
-            <SwipeableTabs.Trigger 
-              value="summary" 
-              className="text-[11px] sm:text-xs md:text-sm px-1 sm:px-1.5 md:px-3 py-2.5 sm:py-2.5 md:py-3 relative"
-              title="Summary"
-            >
-              <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4 flex-shrink-0" />
-              <span className="hidden min-[360px]:inline truncate max-w-[60px] sm:max-w-none ml-0.5 sm:ml-1.5">Summary</span>
-              {!isPro && (
-                <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 absolute -top-0.5 -right-0.5 sm:top-0.5 sm:right-0.5 text-primary bg-background rounded-full p-0.5 shadow-md border border-primary/20" />
-              )}
-            </SwipeableTabs.Trigger>
-            <SwipeableTabs.Trigger 
-              value="chat" 
-              className="text-[11px] sm:text-xs md:text-sm px-1 sm:px-1.5 md:px-3 py-2.5 sm:py-2.5 md:py-3 relative"
-              title="Chat"
-            >
-              <MessageCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-4 md:w-4 flex-shrink-0" />
-              <span className="hidden min-[360px]:inline truncate max-w-[60px] sm:max-w-none ml-0.5 sm:ml-1.5">Chat</span>
-              {!isPro && (
-                <Lock className="h-2.5 w-2.5 sm:h-3 sm:w-3 absolute -top-0.5 -right-0.5 sm:top-0.5 sm:right-0.5 text-primary bg-background rounded-full p-0.5 shadow-md border border-primary/20" />
-              )}
-            </SwipeableTabs.Trigger>
-          </SwipeableTabs.List>
+    <Card className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-none border-0 border-t shadow-none gap-0 py-0">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+        <div className="shrink-0 px-4 pt-3 pb-2">
+          <TabsList className="w-full grid grid-cols-4 h-auto p-1">
+            <TabsTrigger value="captions" className="text-xs py-2">
+              Captions
+            </TabsTrigger>
+            <TabsTrigger value="timestamps" className="text-xs py-2">
+              Timestamps
+            </TabsTrigger>
+            <TabsTrigger value="summary" className="text-xs py-2">
+              Summary
+            </TabsTrigger>
+            <TabsTrigger value="chat" className="text-xs py-2">
+              Chat
+            </TabsTrigger>
+          </TabsList>
         </div>
 
-        {/* Captions Tab */}
-        <SwipeableTabs.Content value="captions" className="flex-1 min-h-0">
+        <TabsContent value="captions" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden flex flex-col overflow-hidden">
           <VideoCaptions
             videoId={currentVideoId}
             captions={transcript.transcript.map(s => s.text).join(' ')}
             onDownload={handleDownloadTranscript}
             onOpenInChatGPT={handleOpenInChatGPT}
           />
-        </SwipeableTabs.Content>
+        </TabsContent>
 
-        {/* Timestamps Tab */}
-        <SwipeableTabs.Content value="timestamps" className="flex-1 min-h-0">
+        <TabsContent value="timestamps" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden flex flex-col overflow-hidden">
           <VideoTimestamps
             videoId={currentVideoId}
             onTimestampClick={handleTimestampClick}
           />
-        </SwipeableTabs.Content>
+        </TabsContent>
 
-        {/* Summary Tab (Pro Protected) */}
-        <SwipeableTabs.Content value="summary" className="flex-1 min-h-0">
-          <Card className="h-full flex flex-col border-0 shadow-none bg-transparent">
-            {!isPro ? (
-              <CardContent className="flex-1 flex items-center justify-center">
-                <ProUpgradePrompt feature="AI Summary" />
-              </CardContent>
-            ) : isStreaming && summary ? (
+        <TabsContent value="summary" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden flex flex-col overflow-hidden">
+          <div className="h-full flex flex-col min-h-0">
+            {isStreaming && summary ? (
               <>
-                <CardHeader className="pb-3 space-y-0">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-muted-foreground" />
-                      <CardTitle className="text-base font-semibold">AI Summary</CardTitle>
+                <div className="shrink-0 px-4 pb-2 text-[11px] text-muted-foreground">Generating…</div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <ScrollArea className="h-full min-h-[200px]">
+                    <div className="p-4">
+                      <div className="prose prose-slate dark:prose-invert prose-sm max-w-none">
+                        <MarkdownContent text={summary} />
+                        <span className="animate-pulse">▊</span>
+                      </div>
                     </div>
-                    <Badge variant="secondary" className="text-xs font-normal animate-pulse">
-                      Generating...
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-auto p-4 sm:p-6">
-                  <div className="prose prose-slate dark:prose-invert prose-sm sm:prose-base max-w-none">
-                    <MarkdownContent text={summary} />
-                    <span className="inline-block animate-pulse text-primary font-bold ml-1">▊</span>
-                  </div>
-                </CardContent>
+                  </ScrollArea>
+                </div>
               </>
             ) : isLoadingSummary ? (
-              <CardContent className="flex-1 flex flex-col items-center justify-center p-6 sm:p-8">
-                <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 text-primary animate-spin mb-3" />
-                <p className="text-muted-foreground text-xs sm:text-sm font-medium">{thinkingText || 'Thinking...'}</p>
-                <p className="text-muted-foreground text-[10px] sm:text-xs mt-1">Analyzing video content</p>
-              </CardContent>
+              <div className="flex-1 flex items-center justify-center p-8">
+                <span className="text-xs text-muted-foreground">{thinkingText || 'Thinking…'}</span>
+              </div>
             ) : summary ? (
               <>
-                <CardHeader className="pb-3 space-y-0">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-muted-foreground" />
-                      <CardTitle className="text-base font-semibold">AI Summary</CardTitle>
+                <div className="shrink-0 px-4 pb-2 flex justify-end">
+                  <Button variant="ghost" size="sm" onClick={handleCopySummary} className="h-auto py-1 px-2 text-[11px] text-muted-foreground hover:text-foreground">
+                    Copy
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <ScrollArea className="h-full min-h-[200px]">
+                    <div className="p-4">
+                      <MarkdownContent text={summary} />
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleCopySummary}
-                      className="h-8 gap-2 text-xs"
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                      <span className="hidden sm:inline">Copy</span>
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex-1 overflow-auto p-4 sm:p-6">
-                  <MarkdownContent text={summary} />
-                </CardContent>
+                  </ScrollArea>
+                </div>
               </>
             ) : (
-              <CardContent className="flex-1 flex flex-col items-center justify-center text-center p-6 sm:p-8">
-                <Sparkles className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground text-sm sm:text-base font-medium mb-2">Summary not available</p>
-                <p className="text-muted-foreground text-xs sm:text-sm">
-                  The AI summary could not be generated for this video.
-                </p>
-              </CardContent>
+              <div className="flex-1 flex items-center justify-center p-8">
+                <span className="text-xs text-muted-foreground">No summary</span>
+              </div>
             )}
-          </Card>
-        </SwipeableTabs.Content>
+          </div>
+        </TabsContent>
 
-        {/* Chat Tab (Pro Protected) */}
-        <SwipeableTabs.Content value="chat" className="flex-1 min-h-0">
-          {!isPro ? (
-            <ProUpgradePrompt feature="AI Chat" />
-          ) : (
-            <VideoChat videoId={currentVideoId} />
-          )}
-        </SwipeableTabs.Content>
-      </SwipeableTabs>
-    </div>
+        <TabsContent value="chat" className="flex-1 min-h-0 mt-0 data-[state=inactive]:hidden flex flex-col overflow-hidden">
+          <VideoChat videoId={currentVideoId} />
+        </TabsContent>
+      </Tabs>
+    </Card>
   )
 }
 
@@ -382,9 +281,6 @@ export default function VideoAnalyzer() {
   const [seekToTime, setSeekToTime] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState('captions')
   const [hasAutoAnalyzed, setHasAutoAnalyzed] = useState(false)
-  const [isPro, setIsPro] = useState(false)
-  const [isLoadingPro, setIsLoadingPro] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   
   // Responsive: use Drawer on mobile, Sheet on desktop
@@ -392,25 +288,6 @@ export default function VideoAnalyzer() {
   
   // Control drawer/sheet open state
   const [isResultsOpen, setIsResultsOpen] = useState(false)
-
-  // Check pro status (authentication check removed - home page is public)
-  useEffect(() => {
-    const checkProStatus = async () => {
-      try {
-        const response = await fetch('/api/user/subscription')
-        const data = await response.json()
-        setIsPro(data.isPro || false)
-        setIsAuthenticated(true) // Set to true if we get a response
-      } catch (error) {
-        console.warn('Error checking pro status:', error)
-        setIsPro(false)
-        setIsAuthenticated(true) // Allow public access - don't block
-      } finally {
-        setIsLoadingPro(false)
-      }
-    }
-    checkProStatus()
-  }, [])
 
   // Get current video ID for the player
   const currentVideoId = extractVideoId(videoUrl)
@@ -768,33 +645,24 @@ export default function VideoAnalyzer() {
         {/* Results in Drawer (Mobile) or Modal (Desktop) */}
         {isMobile ? (
           <Drawer open={isResultsOpen} onOpenChange={handleCloseResults} direction="bottom">
-            <DrawerContent className="max-h-[90vh] flex flex-col">
-              <DrawerHeader className="text-left shrink-0">
-                <DrawerTitle>Video Analysis</DrawerTitle>
+            <DrawerContent className="h-[85vh] max-h-[85vh] flex flex-col rounded-none border-t shadow-none">
+              <DrawerHeader className="text-left shrink-0 px-4 py-3 border-b">
+                <DrawerTitle className="text-sm font-normal">Video Analysis</DrawerTitle>
                 {transcript && (
-                  <DrawerDescription className="flex items-center gap-2 flex-wrap mt-2">
-                    <Badge variant="secondary" className="text-[10px] sm:text-xs font-normal">
-                      {transcript.language}
-                    </Badge>
-                    {transcript.is_generated && (
-                      <Badge variant="outline" className="text-[10px] sm:text-xs font-normal">
-                        auto-generated
-                      </Badge>
-                    )}
-                    <Badge variant="secondary" className="text-[10px] sm:text-xs font-normal">
-                      {transcript.transcript.length.toLocaleString()} segments
-                    </Badge>
+                  <DrawerDescription asChild>
+                    <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                      {transcript.language} · {transcript.transcript.length} segments
+                    </span>
                   </DrawerDescription>
                 )}
               </DrawerHeader>
               {transcript && currentVideoId && (
-                <div className="flex-1 min-h-0 overflow-hidden px-4 pb-4">
-                  <VideoResultsContent
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                    <VideoResultsContent
                     transcript={transcript}
                     currentVideoId={currentVideoId}
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
-                    isPro={isPro}
                     summary={summary}
                     isLoadingSummary={isLoadingSummary}
                     isStreaming={isStreaming}
@@ -810,35 +678,24 @@ export default function VideoAnalyzer() {
           </Drawer>
         ) : (
           <Dialog open={isResultsOpen} onOpenChange={handleCloseResults}>
-            <DialogContent className="max-w-[640px] w-full max-h-[90vh] flex flex-col p-0 gap-0">
-              <DialogHeader className="px-6 pt-6 pb-4 shrink-0 border-b">
-                <DialogTitle>Video Analysis</DialogTitle>
+            <DialogContent className="w-[min(96vw,1100px)] h-[85vh] flex flex-col p-0 gap-0 rounded-none border-0 shadow-none overflow-hidden bg-background">
+              <DialogHeader className="px-4 py-3 shrink-0 border-b">
+                <DialogTitle className="text-sm font-normal">Video Analysis</DialogTitle>
                 {transcript && (
                   <DialogDescription asChild>
-                    <div className="flex items-center gap-2 flex-wrap mt-2">
-                      <Badge variant="secondary" className="text-[10px] sm:text-xs font-normal">
-                        {transcript.language}
-                      </Badge>
-                      {transcript.is_generated && (
-                        <Badge variant="outline" className="text-[10px] sm:text-xs font-normal">
-                          auto-generated
-                        </Badge>
-                      )}
-                      <Badge variant="secondary" className="text-[10px] sm:text-xs font-normal">
-                        {transcript.transcript.length.toLocaleString()} segments
-                      </Badge>
-                    </div>
+                    <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                      {transcript.language} · {transcript.transcript.length} segments
+                    </span>
                   </DialogDescription>
                 )}
               </DialogHeader>
               {transcript && currentVideoId && (
-                <div className="flex-1 min-h-0 overflow-hidden px-6 pb-6">
-                  <VideoResultsContent
+                <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                    <VideoResultsContent
                     transcript={transcript}
                     currentVideoId={currentVideoId}
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
-                    isPro={isPro}
                     summary={summary}
                     isLoadingSummary={isLoadingSummary}
                     isStreaming={isStreaming}

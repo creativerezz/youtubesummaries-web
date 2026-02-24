@@ -4,14 +4,10 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import useSWR from "swr"
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Separator } from "@/components/ui/separator"
-import { MessageCircle, Send, ArrowUp, Loader2 } from "lucide-react"
 
 interface VideoChatProps {
   videoId: string
@@ -123,72 +119,39 @@ export function VideoChat({ videoId }: VideoChatProps) {
 
   if (!captions) {
     return (
-      <Card className="flex flex-col h-full">
-        <CardHeader>
-          <Skeleton className="h-6 w-40" />
-        </CardHeader>
-        <Separator />
-        <CardContent>
-          <div className="space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/6" />
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col h-full min-h-0 p-4">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-full mt-3" />
+        <Skeleton className="h-3 w-4/5 mt-2" />
+      </div>
     )
   }
 
   return (
-    <Card className="flex flex-col overflow-hidden relative h-full border-0 shadow-none bg-transparent">
-      <CardHeader className="pb-3 space-y-0">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-muted-foreground" />
-          <CardTitle className="text-base font-semibold">Chat with Video</CardTitle>
-        </div>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-          Ask questions about the video content
-        </p>
-      </CardHeader>
-      <CardContent className="flex-1 p-0 overflow-hidden relative">
-        <ScrollArea ref={scrollAreaRef} className="h-[500px]" onScroll={handleScroll}>
-          <div className="p-4 sm:p-6">
+    <div className="flex flex-col overflow-hidden relative h-full min-h-0">
+      <div className="flex-1 min-h-0 overflow-hidden relative">
+        <ScrollArea ref={scrollAreaRef} className="h-full min-h-[200px]" onScroll={handleScroll}>
+          <div className="p-4">
             {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full min-h-[400px] text-muted-foreground">
-                <div className="text-center">
-                  <MessageCircle className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-sm font-medium">Start a conversation</p>
-                  <p className="text-xs mt-1">Ask questions about this video</p>
-                </div>
+              <div className="flex items-center justify-center min-h-[200px]">
+                <span className="text-[11px] text-muted-foreground">Ask about this video</span>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 {messages.map((message) => (
                   <div
                     key={message.id}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                    className={message.role === "user" ? "text-right" : "text-left"}
                   >
-                    <div
-                      className={`max-w-[85%] sm:max-w-[75%] rounded-lg px-4 py-2.5 shadow-sm ${
-                        message.role === "user"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-foreground"
-                      }`}
-                    >
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                    </div>
+                    <p className={`inline-block max-w-[85%] text-xs leading-relaxed whitespace-pre-wrap px-3 py-2 ${
+                      message.role === "user" ? "bg-foreground/10 rounded" : "bg-muted/40 rounded"
+                    }`}>
+                      {message.content}
+                    </p>
                   </div>
                 ))}
                 {isLoading && (
-                  <div className="flex justify-start">
-                    <div className="max-w-[85%] sm:max-w-[75%] rounded-lg px-4 py-2.5 bg-muted">
-                      <div className="flex gap-1.5">
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.3s]"></div>
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:-0.15s]"></div>
-                        <div className="h-2 w-2 rounded-full bg-muted-foreground/60 animate-bounce"></div>
-                      </div>
-                    </div>
-                  </div>
+                  <p className="text-[11px] text-muted-foreground py-2">…</p>
                 )}
                 <div ref={messagesEndRef} />
               </div>
@@ -196,36 +159,33 @@ export function VideoChat({ videoId }: VideoChatProps) {
           </div>
         </ScrollArea>
         {showBackToTop && (
-          <Button
+          <button
+            type="button"
             onClick={scrollToTop}
-            size="icon"
-            className="absolute bottom-20 right-4 rounded-full shadow-lg z-10 h-9 w-9"
-            variant="secondary"
+            className="absolute bottom-16 right-4 text-[11px] text-muted-foreground hover:text-foreground z-10"
           >
-            <ArrowUp className="h-4 w-4" />
-            <span className="sr-only">Back to top</span>
-          </Button>
+            ↑ top
+          </button>
         )}
-      </CardContent>
-      <CardFooter className="p-4 border-t border-border/50">
+      </div>
+      <div className="shrink-0 p-3 border-t">
         <form onSubmit={handleSubmit} className="flex gap-2 w-full">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask a question about the video..."
+            placeholder="Ask…"
             disabled={isLoading}
-            className="flex-1"
+            className="flex-1 h-8 text-xs border-0 border-b rounded-none bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
           />
-          <Button type="submit" disabled={isLoading || !input.trim()} size="icon" className="shrink-0">
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-            <span className="sr-only">Send message</span>
-          </Button>
+          <button
+            type="submit"
+            disabled={isLoading || !input.trim()}
+            className="text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50"
+          >
+            {isLoading ? "…" : "→"}
+          </button>
         </form>
-      </CardFooter>
-    </Card>
+      </div>
+    </div>
   )
 }

@@ -1,16 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server"
+import {
+  fetchSupadataChannel,
+  fetchSupadataChannelVideos,
+  fetchSupadataVideo,
+} from "@/lib/supadata"
 
 export const maxDuration = 30;
 
-// fast-proxy-api backend URL (preferred over direct YouTube API)
-const YOUTUBE_PROXY_URL = process.env.YOUTUBE_PROXY_URL || "https://api1.youtubesummaries.cc"
-
-// Fallback: YouTube Data API v3 (only used if proxy fails)
+const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
 
-// Helper to generate UI Avatars URL (reliable placeholder that won't break)
 function getAvatarUrl(name: string, bgColor: string = "6366f1"): string {
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=${bgColor}&color=fff&size=240&bold=true`
+}
+
+function secondsToIsoDuration(sec: number): string {
+  if (!Number.isFinite(sec) || sec <= 0) return "PT0S"
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  const s = Math.floor(sec % 60)
+  let d = "PT"
+  if (h > 0) d += `${h}H`
+  if (m > 0) d += `${m}M`
+  d += `${s}S`
+  return d
 }
 
 interface ChannelInfo {
@@ -113,66 +126,63 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Channel ID is required" }, { status: 400 })
   }
 
-  // Strategy: Try fast-proxy-api first, then direct YouTube API, then demo data
-
-  // Store channelInfo from proxy response in case we need to use it with fallback videos
   let cachedChannelInfo: ChannelInfo | null = null
 
-  // 1. Try fast-proxy-api backend
-  try {
-    console.log("[API] Trying fast-proxy-api for channel...")
-    const proxyResponse = await fetch(
-      `${YOUTUBE_PROXY_URL}/youtube/data/channel/${channelId}?max_results=20`,
-      { next: { revalidate: 300 } }
-    )
+  // 1. Try Supadata first (when API key is set)
+  if (SUPADATA_API_KEY) {
+    try {
+      const [channel, videosData] = await Promise.all([
+        fetchSupadataChannel(SUPADATA_API_KEY, channelId),
+        fetchSupadataChannelVideos(SUPADATA_API_KEY, channelId, 20),
+      ])
 
-    if (proxyResponse.ok) {
-      const data = await proxyResponse.json()
-      console.log("[API] fast-proxy-api channel fetch successful")
+      if (channel) {
+        const channelInfo: ChannelInfo = {
+          title: channel.name,
+          description: channel.description ?? "",
+          thumbnail: channel.thumbnail ?? getAvatarUrl(channel.name),
+          subscriberCount:
+            channel.subscriberCount != null
+              ? channel.subscriberCount.toLocaleString()
+              : "N/A",
+        }
 
-      // Cache channelInfo for potential fallback use
-      if (data.channelInfo) {
-        cachedChannelInfo = data.channelInfo
+        const videoIds = [
+          ...(videosData?.videoIds ?? []),
+          ...(videosData?.shortIds ?? []),
+        ].slice(0, 20)
+
+        if (videoIds.length > 0) {
+          const videoDetails = await Promise.all(
+            videoIds.map((id) => fetchSupadataVideo(SUPADATA_API_KEY!, id))
+          )
+          const videos: VideoItem[] = videoDetails
+            .filter((v): v is NonNullable<typeof v> => v != null)
+            .map((v) => ({
+              id: v.id,
+              title: v.title ?? "",
+              thumbnail: v.thumbnail ?? `https://i.ytimg.com/vi/${v.id}/mqdefault.jpg`,
+              publishedAt: v.uploadDate
+                ? new Date(v.uploadDate).toLocaleDateString()
+                : "",
+              duration: v.duration != null ? secondsToIsoDuration(v.duration) : "PT0S",
+            }))
+
+          if (videos.length > 0) {
+            return NextResponse.json({ channelInfo, videos })
+          }
+        }
+
+        cachedChannelInfo = channelInfo
       }
-
-      // If videos array is empty, try fallback instead of returning empty results
-      if (!data.videos || data.videos.length === 0) {
-        console.warn("[API] fast-proxy-api returned empty videos array, trying fallback...")
-        // Fall through to try direct YouTube API or demo data
-      } else {
-        return NextResponse.json({
-          channelInfo: data.channelInfo,
-          videos: data.videos,
-        })
-      }
+    } catch {
+      // Supadata failed; try YouTube API or demo
     }
-
-    // If proxy returns 403 (quota exceeded), fall through to demo data
-    if (proxyResponse.status === 403) {
-      console.warn("[API] fast-proxy-api quota exceeded, returning demo data for channel")
-      const demoData = DEMO_CHANNELS[channelId] || DEFAULT_DEMO_CHANNEL
-      return NextResponse.json({
-        ...demoData,
-        isDemo: true,
-        warning: "Demo mode: Showing sample videos. Channel data will be restored shortly.",
-      })
-    }
-
-    // If channel not found on proxy, fall through instead of returning 404
-    // This allows the direct YouTube API to handle it (e.g. for new channels not yet indexed by proxy)
-    if (proxyResponse.status === 404) {
-      console.log("[API] fast-proxy-api channel not found, trying direct YouTube API fallback...")
-    } else {
-      console.warn(`[API] fast-proxy-api returned ${proxyResponse.status}, trying fallback...`)
-    }
-  } catch (proxyError) {
-    console.warn("[API] fast-proxy-api unavailable:", proxyError)
   }
 
-  // 2. Fallback to direct YouTube API if we have a key
+  // 2. Fallback to YouTube Data API if we have a key
   if (YOUTUBE_API_KEY) {
     try {
-      console.log("[API] Falling back to direct YouTube API for channel...")
 
       // Fetch channel info
       const channelResponse = await fetch(
@@ -217,24 +227,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             duration: detailsData.items[index]?.contentDetails?.duration || "PT0S",
           }))
 
-          console.log("[API] Direct YouTube API channel fetch successful")
           return NextResponse.json({ channelInfo, videos })
         }
       }
 
       if (channelResponse.status === 403) {
-        console.warn("[API] Direct YouTube API quota exceeded")
+        // Quota exceeded; fall through to demo data
       }
-    } catch (apiError) {
-      console.warn("[API] Direct YouTube API error:", apiError)
+    } catch {
+      // YouTube API failed; fall through to demo data
     }
   }
 
-  // 3. Final fallback: demo data (or use cached channelInfo if available)
-  console.log("[API] All sources failed, returning demo data for channel")
+  // 3. Final fallback: demo data (or use cached channelInfo from Supadata)
   const demoData = DEMO_CHANNELS[channelId] || DEFAULT_DEMO_CHANNEL
-
-  // If we have cached channelInfo from proxy, use it instead of demo channelInfo
   const finalChannelInfo = cachedChannelInfo || demoData.channelInfo
 
   return NextResponse.json({

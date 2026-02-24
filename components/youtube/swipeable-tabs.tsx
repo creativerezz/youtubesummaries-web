@@ -72,8 +72,9 @@ function SwipeableTabsList({ children, className }: { children: React.ReactNode;
   return (
     <div
       data-slot="tabs-list"
+      role="tablist"
       className={cn(
-        "inline-flex h-fit items-center justify-center rounded-lg bg-muted/50 sm:bg-muted p-0.5 sm:p-1 md:p-1.5 text-muted-foreground w-full overflow-hidden",
+        "flex w-full border-b text-xs",
         className,
       )}
     >
@@ -94,16 +95,16 @@ function SwipeableTabsTrigger({
   return (
     <button
       type="button"
+      role="tab"
       data-slot="tabs-trigger"
       data-state={isSelected ? "active" : "inactive"}
+      aria-selected={isSelected}
       onClick={() => onValueChange(value)}
       title={title}
       className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-md sm:rounded-lg transition-all outline-none focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:ring-offset-1 disabled:pointer-events-none disabled:opacity-50 flex-1 w-full min-w-0",
-        "font-medium active:scale-[0.97] touch-manipulation",
-        isSelected 
-          ? "bg-background text-foreground shadow-sm z-10" 
-          : "text-muted-foreground hover:bg-background/50 hover:text-foreground active:bg-background/70",
+        "flex-1 min-w-0 py-2.5 -mb-px border-b-2 border-transparent text-muted-foreground outline-none focus-visible:ring-1 focus-visible:ring-inset disabled:pointer-events-none disabled:opacity-50",
+        "hover:text-foreground/70",
+        isSelected ? "border-foreground text-foreground font-medium" : "border-transparent",
         className,
       )}
     >
@@ -154,7 +155,7 @@ function SwipeableTabsContent({ value, children, className }: { value: string; c
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      className={cn("mt-1 sm:mt-1.5 md:mt-2 outline-none focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:ring-offset-1", className)}
+      className={cn("mt-2 flex-1 flex flex-col min-h-0 overflow-hidden", className)}
     >
       {children}
     </div>

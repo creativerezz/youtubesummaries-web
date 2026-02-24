@@ -73,10 +73,16 @@ export const rateLimiters = {
     "ratelimit:summarize:auth:"
   ),
 
-  // Chat: 20 requests per minute (authenticated only)
-  chat: createRateLimiter(
+  // Chat: 10 requests per minute for anonymous users
+  chatAnonymous: createRateLimiter(
+    Ratelimit.slidingWindow(10, "1 m"),
+    "ratelimit:chat:anon:"
+  ),
+
+  // Chat: 20 requests per minute for authenticated users
+  chatAuthenticated: createRateLimiter(
     Ratelimit.slidingWindow(20, "1 m"),
-    "ratelimit:chat:"
+    "ratelimit:chat:auth:"
   ),
 
   // Beta signup: 5 per hour per IP

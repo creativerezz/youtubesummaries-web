@@ -29,7 +29,7 @@ export function Hero() {
         <div className="absolute left-0 top-0 h-320 w-60 -translate-y-87.5 -rotate-45 bg-[radial-gradient(50%_50%_at_50%_50%,hsl(var(--primary)/.1)_0,transparent_100%)]" />
       </div>
 
-      <div className="relative pt-24">
+      <div className="relative pt-24 pb-12 sm:pb-16 md:pb-20">
         <div className="absolute inset-0 -z-10 size-full [background:radial-gradient(125%_125%_at_50%_100%,transparent_0%,hsl(var(--muted))_100%)]" />
 
         <div className="mx-auto max-w-5xl px-6">
@@ -39,7 +39,7 @@ export function Hero() {
             </h1>
 
             <p className="mt-8 max-w-2xl text-pretty text-lg text-muted-foreground">
-              Save 97% of your time with AI-powered transcripts and summaries. Start your free 14-day trial—no credit card required.
+              Save 97% of your time with AI-powered transcripts and summaries. 100% free to start—no credit card required.
             </p>
 
             <div className="mt-12 flex items-center gap-2">
@@ -49,7 +49,7 @@ export function Hero() {
                   size="lg"
                   className="rounded-xl px-5 text-base"
                 >
-                  <span className="text-nowrap">Start My Free Trial</span>
+                  <span className="text-nowrap">Try It Free</span>
                   <ArrowDown className="ml-2 h-4 w-4" />
                 </Button>
               </div>

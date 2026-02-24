@@ -8,13 +8,11 @@ import {
   rateLimitResponse,
   rateLimitHeaders,
 } from "@/lib/rate-limit"
+import { fetchSupadataSearch } from "@/lib/supadata"
 
 export const maxDuration = 30;
 
-// fast-proxy-api backend URL (preferred over direct YouTube API)
-const YOUTUBE_PROXY_URL = process.env.YOUTUBE_PROXY_URL || "https://api1.youtubesummaries.cc"
-
-// Fallback: YouTube Data API v3 (only used if proxy fails)
+const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY
 const YOUTUBE_API_URL = "https://www.googleapis.com/youtube/v3"
 
@@ -134,47 +132,35 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Strategy: Try fast-proxy-api first, then direct YouTube API, then demo data
-
-  // 1. Try fast-proxy-api backend
-  try {
-    console.log("[API] Trying fast-proxy-api for search...")
-    const proxyResponse = await fetch(
-      `${YOUTUBE_PROXY_URL}/youtube/data/search?q=${encodeURIComponent(query)}&max_results=12`,
-      { next: { revalidate: 60 } }
-    )
-
-    if (proxyResponse.ok) {
-      const data = await proxyResponse.json()
-      console.log("[API] fast-proxy-api search successful")
-      return NextResponse.json(
-        { videos: data.videos || [] },
-        { headers: rateLimitHeaders(rateLimitResult) }
-      )
+  // 1. Try Supadata first (when API key is set)
+  if (SUPADATA_API_KEY) {
+    try {
+      const searchResult = await fetchSupadataSearch(SUPADATA_API_KEY, query, 12)
+      if (searchResult?.results?.length) {
+        const videos = searchResult.results
+          .filter((r) => r.type === "video")
+          .map((r) => ({
+            id: r.id,
+            title: r.title ?? "",
+            thumbnail: r.thumbnail ?? `https://i.ytimg.com/vi/${r.id}/mqdefault.jpg`,
+            channelTitle: r.channel?.name ?? "",
+            publishedAt: r.uploadDate ?? "",
+          }))
+        if (videos.length > 0) {
+          return NextResponse.json(
+            { videos },
+            { headers: rateLimitHeaders(rateLimitResult) }
+          )
+        }
+      }
+    } catch {
+      // Supadata failed; try YouTube API or demo
     }
-
-    // If proxy returns 403 (quota exceeded), fall through to demo data
-    if (proxyResponse.status === 403) {
-      console.warn("[API] fast-proxy-api quota exceeded, returning demo data")
-      return NextResponse.json(
-        {
-          videos: DEMO_VIDEOS,
-          isDemo: true,
-          warning: "Demo mode: Showing sample videos. Search functionality will be restored shortly.",
-        },
-        { headers: rateLimitHeaders(rateLimitResult) }
-      )
-    }
-
-    console.warn(`[API] fast-proxy-api returned ${proxyResponse.status}, trying fallback...`)
-  } catch (proxyError) {
-    console.warn("[API] fast-proxy-api unavailable:", proxyError)
   }
 
-  // 2. Fallback to direct YouTube API if we have a key
+  // 2. Fallback to YouTube Data API if we have a key
   if (YOUTUBE_API_KEY) {
     try {
-      console.log("[API] Falling back to direct YouTube API...")
       const response = await fetch(
         `${YOUTUBE_API_URL}/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=12&key=${YOUTUBE_API_KEY}`,
       )
@@ -189,7 +175,6 @@ export async function GET(request: NextRequest) {
             channelTitle: item.snippet.channelTitle,
             publishedAt: item.snippet.publishedAt,
           })) || []
-        console.log("[API] Direct YouTube API search successful")
         return NextResponse.json(
           { videos },
           { headers: rateLimitHeaders(rateLimitResult) }
@@ -205,7 +190,6 @@ export async function GET(request: NextRequest) {
   }
 
   // 3. Final fallback: demo data
-  console.log("[API] All sources failed, returning demo data")
   return NextResponse.json(
     {
       videos: DEMO_VIDEOS,

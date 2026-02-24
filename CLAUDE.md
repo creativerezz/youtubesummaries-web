@@ -11,8 +11,8 @@ This is a Next.js 16 application that provides YouTube video transcript extracti
 - **Supabase** for database (user profiles, subscriptions, usage logs)
 - **Polar.sh** for payments/subscriptions
 - **External APIs**:
-  - FastAPI at `https://api1.youtubesummaries.cc` - upstream transcript/metadata source
-  - Cloudflare Worker at `https://youtube-edge-api.automatehub.workers.dev` - D1 caching layer
+  - **Supadata** (`https://api.supadata.ai`) - primary transcript, metadata, channel, search (requires `SUPADATA_API_KEY`)
+  - Cloudflare Worker - transcript fallback (D1 caching layer)
 
 ## Quick Start Commands
 
@@ -71,6 +71,9 @@ Add to `.env.local`:
 - `NEXT_PUBLIC_TRANSCRIPT_API_URL` - Transcript worker URL (optional, defaults to production)
 
 ### Server-side
+- `SUPADATA_API_KEY` - Supadata API key for transcript, metadata, channel, search (primary source; optional, gracefully degrades)
+- `TRANSCRIPT_WORKER_URL` - Cloudflare Worker transcript fallback (optional, default: youtube-transcript-storage.automatehub.workers.dev)
+- `YOUTUBE_API_KEY` - YouTube Data API key for channel/search fallback when Supadata unavailable (optional)
 - `CLERK_SECRET_KEY` - Clerk API secret (optional, gracefully degrades)
 - `POSTHOG_API_KEY` - PostHog for LLM analytics (optional)
 - `POSTHOG_HOST` - PostHog host for server (optional)
@@ -134,6 +137,7 @@ apps/web/
 ├── lib/                       # Core utilities
 │   ├── openai-client.ts       # OpenRouter client with PostHog tracking
 │   ├── youtube-transcript-api.ts # Worker API client
+│   ├── youtube-transcript-direct/ # Direct YouTube extraction (youtubei + captionTracks fallback)
 │   ├── supabase.ts            # Supabase server client
 │   ├── auth.ts                # Auth helpers (Clerk)
 │   ├── posthog.ts             # Client-side analytics
@@ -298,7 +302,7 @@ All `/api/*` routes (non-v1) proxy to `/api/v1/*` for backwards compatibility.
 ```
 User Input (VideoAnalyzer Component)
     ↓
-lib/youtube-transcript-api.ts → Cloudflare Worker (D1 cache) → FastAPI (upstream)
+lib/youtube-transcript-api.ts → /api/v1/transcript → Supadata | Worker | Direct (youtubei + captionTracks)
     ↓
 POST /api/v1/summarize or /api/v1/chat
     ↓
@@ -482,6 +486,11 @@ pnpm install
 - Ensure `lightningcss` is installed as dependency (not dev dependency)
 - Check `postcss.config.mjs` configuration
 - Clear `.next` cache: `rm -rf .next`
+
+### Transcript/channel API failures
+- **Transcript**: Supadata → Cloudflare Worker → Direct extraction (`lib/youtube-transcript-direct/`). Direct extraction uses youtubei + captionTracks with no external transcript service when both Supadata and Worker fail.
+- **Channel**: fast-proxy-api → YouTube Data API (requires `YOUTUBE_API_KEY`) → demo data. Set `YOUTUBE_API_KEY` in `.env.local` for live channel data when the proxy is unreachable.
+- Channel endpoint falls back to demo data when proxy is unavailable
 
 ## Important Notes
 

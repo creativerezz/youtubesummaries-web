@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BetaSignup } from "@/components/beta-signup";
-import { Sparkles, Zap, Play, Search } from "lucide-react";
+import { Zap, Play, Search } from "lucide-react";
 import Link from "next/link";
 
 export function CTA() {
@@ -60,7 +60,7 @@ export function CTA() {
               className="group w-full sm:w-auto px-8"
             >
               <Play className="mr-2 h-4 w-4" />
-              Start My Free Trial
+              Try It Free
             </Button>
             <Button
               asChild
